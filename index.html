@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Book Finder</title>
+  <title>Book Finder - Home</title>
   <link rel="stylesheet" href="styles.css">
-  <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -18,10 +17,10 @@
 </header>
 
 <nav id="main-nav" class="hidden">
-  <button data-tab="search" class="active">Search</button>
-  <button data-tab="next">Next Reads</button>
-  <button data-tab="stats">Stats</button>
-  <button data-tab="library">Library</button>
+  <a href="search.html">Search</a>
+  <a href="next.html">Next Reads</a>
+  <a href="stats.html">Stats</a>
+  <a href="library.html">Library</a>
   <button id="logout-btn" class="danger">Logout</button>
 </nav>
 
@@ -46,33 +45,6 @@
     <p>Pick as many as you like</p>
     <div class="genre-tags" id="genre-list"></div>
     <button id="save-genres-btn">Save & Continue</button>
-  </div>
-
-  <!-- Tabs content -->
-  <div id="tab-search" class="tab-content">
-    <h2>Find books</h2>
-    <div class="search-bar">
-      <input type="text" id="search-query" placeholder="Title, author, ISBN..." autocomplete="off">
-      <button id="search-button">Search</button>
-    </div>
-    <div id="search-results" class="results-grid"></div>
-  </div>
-
-  <div id="tab-next" class="tab-content hidden">
-    <h2>Your Next Reads</h2>
-    <div id="recommendations" class="results-grid"></div>
-  </div>
-
-  <div id="tab-stats" class="tab-content hidden">
-    <h2>Your Stats</h2>
-    <div id="stats-content" class="stats-card"></div>
-  </div>
-
-  <div id="tab-library" class="tab-content hidden">
-    <h2>Nearby Libraries</h2>
-    <p id="location-status">Click the button to find libraries near you</p>
-    <button id="locate-btn">Detect Location</button>
-    <div id="library-list" class="library-list"></div>
   </div>
 
 </div>
