@@ -1,0 +1,2 @@
+const SUPABASE_URL = 'https://ojdogqpkfjcuerwppozo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZG9ncXBrZmpjdWVyd3Bwb3pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1NDc0MTYsImV4cCI6MjA4NzEyMzQxNn0.9-HeTy7QJ3BR1Jab8MUJhuZtJp3prJ7jEXxzCilhpi4';  // your anon/public key
