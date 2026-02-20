@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Book Finder - Library</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<header>
+  <div class="header-content">
+    <h1>Book Finder</h1>
+    <p id="greeting">Loading...</p>
+  </div>
+</header>
+
+<nav id="main-nav" class="hidden">
+  <a href="search.html">Search</a>
+  <a href="next.html">Next Reads</a>
+  <a href="stats.html">Stats</a>
+  <a href="library.html" class="active">Library</a>
+  <button id="logout-btn" class="danger">Logout</button>
+</nav>
+
+<div class="container">
+  <div id="content" class="hidden">
+    <h2>Nearby Libraries</h2>
+    <p id="location-status">Click the button to find libraries near you</p>
+    <button id="locate-btn">Detect Location</button>
+    <div id="library-list" class="library-list"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
