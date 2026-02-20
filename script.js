@@ -5,6 +5,16 @@ const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // ← Paste your Google Books API key here
 const API_KEY = 'AIzaSyBCqpaPv8pOAfdfXOiuTFAp61UYnwUKPC0';   // ← AIzaSyC...  (from Google Cloud Console)
 
+// ────────────────────────────────────────────────
+//  CONFIG
+// ────────────────────────────────────────────────
+const SUPABASE_URL    = 'https://your-project-ref.supabase.co';
+const SUPABASE_ANON   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-anon-key-here';
+
+const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const API_KEY = 'YOUR_GOOGLE_BOOKS_API_KEY_HERE';   // ← Paste your real key
+
 const COMMON_GENRES = [
   "Fiction", "Mystery", "Thriller", "Fantasy", "Science Fiction",
   "Romance", "Horror", "Historical Fiction", "Non-Fiction",
@@ -13,15 +23,12 @@ const COMMON_GENRES = [
 ];
 
 // ────────────────────────────────────────────────
-//  STATE
+//  STATE + DOM (unchanged from before)
 // ────────────────────────────────────────────────
 let currentUser = null;
 let userGenres  = [];
 let savedBooks  = [];
 
-// ────────────────────────────────────────────────
-//  DOM
-// ────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const $$ = sel => document.querySelectorAll(sel);
 
@@ -49,15 +56,12 @@ const elements = {
   logoutBtn:      $('logout-btn')
 };
 
-// ────────────────────────────────────────────────
-//  AUTH UI
-// ────────────────────────────────────────────────
 let isSignUp = false;
 
 function updateAuthUI() {
   elements.authTitle.textContent   = isSignUp ? "Create Account" : "Sign In";
   elements.authAction.textContent   = isSignUp ? "Sign Up" : "Sign In";
-  elements.toggleMode.textContent   = isSignUp ? "Sign In" : "Sign Up";
+  elements.toggleMode.textContent   = isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up";
   elements.authMessage.textContent  = "";
 }
 
@@ -71,7 +75,7 @@ elements.authAction.onclick = async () => {
   const password = elements.password.value.trim();
 
   if (!email || !password) {
-    elements.authMessage.textContent = "Please fill in both fields";
+    elements.authMessage.textContent = "Email and password are required";
     elements.authMessage.className = "message error";
     return;
   }
@@ -79,329 +83,62 @@ elements.authAction.onclick = async () => {
   elements.authMessage.textContent = "Processing...";
   elements.authMessage.className = "message";
 
+  console.log(`[Auth] Attempting ${isSignUp ? 'signup' : 'login'} for ${email}`);
+
   let result;
 
-  if (isSignUp) {
-    result = await supabase.auth.signUp({ email, password });
-  } else {
-    result = await supabase.auth.signInWithPassword({ email, password });
-  }
-
-  if (result.error) {
-    elements.authMessage.textContent = result.error.message;
-    elements.authMessage.className = "message error";
-    return;
-  }
-
-  // If sign-up requires email confirmation
-  if (result.data.user && !result.data.session) {
-    elements.authMessage.textContent = "Check your email to confirm your account";
-    elements.authMessage.className = "message success";
-    return;
-  }
-
-  currentUser = result.data.user;
-  await loadUserData();
-  completeLogin();
-};
-
-// ────────────────────────────────────────────────
-//  DATA
-// ────────────────────────────────────────────────
-async function loadUserData() {
-  if (!currentUser) return;
-
-  const { data, error } = await supabase
-    .from('user_data')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .single();
-
-  if (error && error.code !== 'PGRST116') {
-    console.error("Load error:", error);
-    return;
-  }
-
-  if (data) {
-    userGenres = data.favorite_genres || [];
-    savedBooks = data.searched_books || [];
-  } else {
-    // Create first record
-    await supabase.from('user_data').insert({
-      user_id: currentUser.id,
-      username: currentUser.email.split('@')[0],
-      favorite_genres: [],
-      searched_books: []
-    });
-    userGenres = [];
-    savedBooks = [];
-  }
-}
-
-async function saveUserData() {
-  if (!currentUser) return;
-  await supabase
-    .from('user_data')
-    .update({
-      favorite_genres: userGenres,
-      searched_books: savedBooks
-    })
-    .eq('user_id', currentUser.id);
-}
-
-function completeLogin() {
-  const name = currentUser.email.split('@')[0];
-  elements.greeting.textContent = `Welcome, ${name}`;
-  elements.authScreen.classList.add('hidden');
-  elements.mainNav.classList.remove('hidden');
-
-  if (userGenres.length === 0) {
-    elements.genreScreen.classList.remove('hidden');
-    renderGenres();
-  } else {
-    showTab('search');
-  }
-
-  updateStats();
-}
-
-// ────────────────────────────────────────────────
-//  GENRES
-// ────────────────────────────────────────────────
-function renderGenres() {
-  elements.genreList.innerHTML = '';
-  COMMON_GENRES.forEach(genre => {
-    const tag = document.createElement('div');
-    tag.className = 'genre-tag';
-    tag.textContent = genre;
-    if (userGenres.includes(genre)) tag.classList.add('selected');
-
-    tag.onclick = () => {
-      if (userGenres.includes(genre)) {
-        userGenres = userGenres.filter(g => g !== genre);
-        tag.classList.remove('selected');
-      } else {
-        userGenres.push(genre);
-        tag.classList.add('selected');
-      }
-    };
-
-    elements.genreList.appendChild(tag);
-  });
-}
-
-elements.saveGenresBtn.onclick = async () => {
-  if (userGenres.length === 0) {
-    alert("Please select at least one genre");
-    return;
-  }
-  await saveUserData();
-  elements.genreScreen.classList.add('hidden');
-  showTab('search');
-  updateStats();
-};
-
-// ────────────────────────────────────────────────
-//  TABS
-// ────────────────────────────────────────────────
-function showTab(tab) {
-  $$('.tab-content').forEach(el => el.classList.add('hidden'));
-  $(`tab-${tab}`).classList.remove('hidden');
-
-  $$('nav button[data-tab]').forEach(btn => btn.classList.remove('active'));
-  document.querySelector(`nav button[data-tab="${tab}"]`).classList.add('active');
-
-  if (tab === 'next') renderRecommendations();
-  if (tab === 'stats') updateStats();
-}
-
-$$('nav button[data-tab]').forEach(btn => {
-  btn.onclick = () => showTab(btn.dataset.tab);
-});
-
-// ────────────────────────────────────────────────
-//  BOOK SEARCH  ←  now using your Google API key
-// ────────────────────────────────────────────────
-elements.searchButton.onclick = searchBooks;
-elements.searchQuery.onkeypress = e => { if (e.key === 'Enter') searchBooks(); };
-
-async function searchBooks() {
-  const q = elements.searchQuery.value.trim();
-  if (!q) {
-    elements.searchResults.innerHTML = '<p class="message">Please enter a search term</p>';
-    return;
-  }
-
-  elements.searchResults.innerHTML = '<p class="message">Searching...</p>';
-
   try {
-    // Using your API key here
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=10&key=${API_KEY}`;
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status} – ${res.statusText}`);
+    if (isSignUp) {
+      result = await supabase.auth.signUp({ email, password });
+    } else {
+      result = await supabase.auth.signInWithPassword({ email, password });
     }
 
-    const data = await res.json();
+    console.log('[Auth] Raw result:', result);
 
-    if (!data.items?.length) {
-      elements.searchResults.innerHTML = '<p class="message">No books found for this search.</p>';
+    if (result.error) {
+      let msg = result.error.message;
+      if (msg.includes('not authorized')) {
+        msg = "Signup restricted – use your dashboard email or set up custom SMTP (check Supabase Auth settings)";
+      } else if (msg.includes('confirmed')) {
+        msg = "Email not confirmed – check your inbox (or disable confirmation in dashboard)";
+      } else if (msg.includes('already registered')) {
+        msg = "Email already in use – try signing in instead";
+      }
+      elements.authMessage.textContent = msg;
+      elements.authMessage.className = "message error";
+      console.error('[Auth] Error:', result.error);
       return;
     }
 
-    elements.searchResults.innerHTML = '';
-
-    data.items.forEach(item => {
-      const info = item.volumeInfo;
-      const title     = info.title || 'Unknown Title';
-      const authors   = info.authors?.join(', ') || 'Unknown Author';
-      const thumbnail = info.imageLinks?.thumbnail?.replace('http://', 'https://') 
-                     || 'https://via.placeholder.com/128x192?text=No+Cover';
-      const subjects  = info.categories || [];
-
-      const card = document.createElement('div');
-      card.className = 'book-card';
-      card.innerHTML = `
-        <img src="${thumbnail}" alt="${title}" loading="lazy">
-        <div class="content">
-          <strong>${title}</strong>
-          <em>${authors}</em>
-          <small>${subjects.join(', ') || '—'}</small>
-        </div>
-      `;
-
-      card.onclick = async () => {
-        const book = { 
-          title, 
-          author: authors, 
-          genres: subjects, 
-          thumbnail 
-        };
-
-        // Avoid duplicates
-        if (!savedBooks.some(b => b.title === title && b.author === authors)) {
-          savedBooks.push(book);
-          await saveUserData();
-          alert(`Added "${title}" to your saved books`);
-          renderRecommendations();
-          updateStats();
-        }
-      };
-
-      elements.searchResults.appendChild(card);
-    });
-  } catch (err) {
-    elements.searchResults.innerHTML = 
-      `<p class="message error">Error: ${err.message}</p>`;
-    console.error(err);
-  }
-}
-
-// ────────────────────────────────────────────────
-//  RECOMMENDATIONS (simple overlap-based)
-// ────────────────────────────────────────────────
-function renderRecommendations() {
-  elements.recommendations.innerHTML = '';
-
-  if (savedBooks.length === 0) {
-    elements.recommendations.innerHTML = 
-      '<p class="message">Save some books first to get recommendations.</p>';
-    return;
-  }
-
-  const allGenres = new Set([...userGenres, ...savedBooks.flatMap(b => b.genres || [])]);
-
-  const suggestions = savedBooks
-    .filter(b => b.genres?.some(g => allGenres.has(g)))
-    .slice(0, 8);
-
-  if (suggestions.length === 0) {
-    elements.recommendations.innerHTML = 
-      '<p class="message">No matching recommendations yet.</p>';
-    return;
-  }
-
-  suggestions.forEach(b => {
-    const div = document.createElement('div');
-    div.className = 'book-card';
-    div.innerHTML = `
-      <img src="${b.thumbnail}" alt="${b.title}" loading="lazy">
-      <div class="content">
-        <strong>${b.title}</strong>
-        ${b.author}<br>
-        <small>${b.genres?.join(', ') || '—'}</small>
-      </div>
-    `;
-    elements.recommendations.appendChild(div);
-  });
-}
-
-// ────────────────────────────────────────────────
-//  STATS
-// ────────────────────────────────────────────────
-function updateStats() {
-  elements.statsContent.innerHTML = `
-    <p><strong>User:</strong> ${currentUser?.email || '—'}</p>
-    <p><strong>Genres selected:</strong> ${userGenres.length} (${userGenres.join(', ') || 'none'})</p>
-    <p><strong>Books saved:</strong> ${savedBooks.length}</p>
-  `;
-}
-
-// ────────────────────────────────────────────────
-//  LOCATION (demo)
-// ────────────────────────────────────────────────
-elements.locateBtn.onclick = () => {
-  if (!navigator.geolocation) {
-    elements.locationStatus.textContent = "Geolocation not supported in this browser";
-    return;
-  }
-
-  elements.locationStatus.textContent = "Getting location...";
-
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const { latitude, longitude } = pos.coords;
-      elements.locationStatus.textContent = `≈ ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-
-      // Simulated libraries near Madison, MS
-      const fakeLibs = [
-        { name: "Madison County Library (Madison)", distance: "≈ 1–3 mi" },
-        { name: "Ridgeland Public Library", distance: "≈ 7–9 mi" },
-        { name: "Canton Public Library", distance: "≈ 12–15 mi" },
-        { name: "Flowood Library", distance: "≈ 10–12 mi" }
-      ];
-
-      elements.libraryList.innerHTML = fakeLibs
-        .map(l => `<p>${l.name} — ${l.distance}</p>`)
-        .join('');
-    },
-    err => {
-      elements.locationStatus.textContent = `Error: ${err.message}`;
+    // Signup with confirmation off → should have session immediately
+    if (result.data.session) {
+      currentUser = result.data.user;
+      await loadUserData();
+      completeLogin();
+      elements.authMessage.textContent = "Success! You're in.";
+      elements.authMessage.className = "message success";
+    } else if (isSignUp) {
+      // Confirmation still on somehow
+      elements.authMessage.textContent = "Check your email to confirm signup (confirmation is still enabled in dashboard)";
+      elements.authMessage.className = "message success";
+    } else {
+      elements.authMessage.textContent = "Login failed – no session returned";
+      elements.authMessage.className = "message error";
     }
-  );
+
+  } catch (err) {
+    console.error('[Auth] Exception:', err);
+    elements.authMessage.textContent = "Network or client error – check console & Supabase URL/key";
+    elements.authMessage.className = "message error";
+  }
 };
 
-// ────────────────────────────────────────────────
-//  LOGOUT
-// ────────────────────────────────────────────────
-elements.logoutBtn.onclick = async () => {
-  await supabase.auth.signOut();
-  currentUser = null;
-  userGenres = [];
-  savedBooks = [];
-  elements.greeting.textContent = "Please sign in or create an account";
-  elements.mainNav.classList.add('hidden');
-  elements.genreScreen.classList.add('hidden');
-  elements.authScreen.classList.remove('hidden');
-  isSignUp = false;
-  updateAuthUI();
-};
+// The rest of your code (loadUserData, saveUserData, completeLogin, renderGenres, saveGenresBtn.onclick, showTab, searchBooks, etc.) remains the same as in the previous version.
+// Just make sure to keep the onAuthStateChange and initial getSession() at the bottom.
 
-// ────────────────────────────────────────────────
-//  INIT + AUTH LISTENER
-// ────────────────────────────────────────────────
 supabase.auth.onAuthStateChange(async (event, session) => {
+  console.log('[Auth] State changed:', event, session ? 'session exists' : 'no session');
   if (session) {
     currentUser = session.user;
     await loadUserData();
@@ -414,10 +151,11 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
-// Initial session check on page load
 (async () => {
+  console.log('[Init] Checking existing session...');
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
+    console.log('[Init] Found existing session');
     currentUser = session.user;
     await loadUserData();
     completeLogin();
