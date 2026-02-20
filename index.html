@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Book Finder</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary: #4a6fa5;
+      --light: #f8f9fa;
+      --dark: #333;
+      --accent: #e67e22;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      background: var(--light);
+      color: var(--dark);
+    }
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    nav {
+      display: flex;
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    nav button {
+      flex: 1;
+      padding: 1rem;
+      border: none;
+      background: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    nav button.active {
+      border-bottom: 4px solid var(--primary);
+      color: var(--primary);
+    }
+    nav button:hover {
+      background: #f0f4ff;
+    }
+    .container {
+      max-width: 900px;
+      margin: 1.5rem auto;
+      padding: 0 1rem;
+    }
+    .hidden { display: none; }
+    #auth-screen {
+      max-width: 500px;
+      margin: 4rem auto;
+      padding: 2rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+    input, button {
+      padding: 0.8rem 1.2rem;
+      margin: 0.6rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      width: calc(100% - 2.4rem);
+      max-width: 400px;
+      box-sizing: border-box;
+    }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover { background: #3a5a8f; }
+    .toggle-link {
+      color: var(--primary);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .book-card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      background: white;
+      display: flex;
+      gap: 1rem;
+      cursor: pointer;
+    }
+    .book-card img {
+      width: 80px;
+      height: auto;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+    .genre-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .genre-tag {
+      background: #e0e7ff;
+      color: var(--primary);
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .genre-tag.selected {
+      background: #a0c4ff;
+      font-weight: bold;
+    }
+    #stats {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Book Finder</h1>
+  <p id="user-greeting">Welcome! Please sign in or sign up</p>
+</header>
+
+<nav id="main-nav" class="hidden">
+  <button data-tab="search" class="active">Search Books</button>
+  <button data-tab="next">Next Reads</button>
+  <button data-tab="stats">My Stats</button>
+  <button data-tab="library">My Library</button>
+  <button id="logout-btn">Logout</button>
+</nav>
+
+<div class="container">
+
+  <!-- Auth Screen (Sign Up / Sign In) -->
+  <div id="auth-screen">
+    <h2 id="auth-title">Sign In</h2>
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <button id="auth-btn">Sign In</button>
+    <p>Don't have an account? <span class="toggle-link" id="toggle-auth">Sign Up</span></p>
+    <p id="auth-message" style="color: red; min-height: 1.2em;"></p>
+  </div>
+
+  <!-- Genre Selection (shown after first signup/login if empty) -->
+  <div id="genre-screen" class="hidden">
+    <h2>What genres do you love?</h2>
+    <p>Select as many as you like</p>
+    <div class="genre-tags" id="genre-select"></div>
+    <button id="save-genres">Save & Start</button>
+  </div>
+
+  <!-- Main Tabs -->
+  <div id="tab-search" class="tab-content hidden">
+    <h2>Find a Book</h2>
+    <input type="text" id="search-input" placeholder="Book title, author..." style="width:70%; max-width:500px;" />
+    <button id="search-btn">Search</button>
+    <div id="search-results"></div>
+  </div>
+
+  <div id="tab-next" class="tab-content hidden">
+    <h2>Your Next Reads</h2>
+    <div id="next-reads"></div>
+  </div>
+
+  <div id="tab-stats" class="tab-content hidden">
+    <h2>Your Reading Stats</h2>
+    <div id="stats"></div>
+  </div>
+
+  <div id="tab-library" class="tab-content hidden">
+    <h2>My Library / Nearest Libraries</h2>
+    <p id="location-info">Click to detect location...</p>
+    <button id="get-location">Find Nearest Libraries</button>
+    <div id="library-results"></div>
+  </div>
+
+</div>
+
+<script>
+// ────────────────────────────────────────────────
+//  Supabase Setup
+// ────────────────────────────────────────────────
+const SUPABASE_URL    = 'https://your-project-ref.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-anon-key-here';
+
+const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ────────────────────────────────────────────────
+//  State
+// ────────────────────────────────────────────────
+let currentUser = null;
+let userGenres = [];
+let searchedBooks = [];
+
+// Common genres
+const COMMON_GENRES = [
+  "Fiction", "Mystery", "Fantasy", "Science Fiction", "Romance",
+  "Thriller", "Horror", "Non-Fiction", "Biography", "History",
+  "Self-Help", "Young Adult", "Children's", "Poetry", "Classics"
+];
+
+// ────────────────────────────────────────────────
+//  DOM Elements
+// ────────────────────────────────────────────────
+const authScreen     = document.getElementById('auth-screen');
+const genreScreen    = document.getElementById('genre-screen');
+const mainNav        = document.getElementById('main-nav');
+const greeting       = document.getElementById('user-greeting');
+const authTitle      = document.getElementById('auth-title');
+const authBtn        = document.getElementById('auth-btn');
+const toggleLink     = document.getElementById('toggle-auth');
+const authMessage    = document.getElementById('auth-message');
+const tabs           = document.querySelectorAll('nav button[data-tab]');
+const tabContents    = document.querySelectorAll('.tab-content');
+
+// ────────────────────────────────────────────────
+//  Auth Logic
+// ────────────────────────────────────────────────
+let isSignupMode = false;
+
+function updateAuthUI() {
+  authTitle.textContent = isSignupMode ? 'Sign Up' : 'Sign In';
+  authBtn.textContent   = isSignupMode ? 'Create Account' : 'Sign In';
+  toggleLink.textContent = isSignupMode ? 'Sign In' : 'Sign Up';
+}
+
+toggleLink.onclick = () => {
+  isSignupMode = !isSignupMode;
+  updateAuthUI();
+  authMessage.textContent = '';
+};
+
+authBtn.onclick = async () => {
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
+  authMessage.textContent = '';
+
+  if (!email || !password) {
+    authMessage.textContent = 'Please fill in all fields';
+    return;
+  }
+
+  let res;
+
+  if (isSignupMode) {
+    res = await supabase.auth.signUp({ email, password });
+  } else {
+    res = await supabase.auth.signInWithPassword({ email, password });
+  }
+
+  if (res.error) {
+    authMessage.textContent = res.error.message;
+    return;
+  }
+
+  // For signUp, user might need to confirm email (if enabled)
+  if (res.data.user && !res.data.session) {
+    authMessage.style.color = 'green';
+    authMessage.textContent = 'Check your email to confirm signup!';
+    return;
+  }
+
+  // Logged in
+  currentUser = res.data.user;
+  await loadUserData();
+  finishLogin();
+};
+
+async function loadUserData() {
+  if (!currentUser) return;
+
+  const { data, error } = await supabase
+    .from('user_data')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // not "no rows"
+    console.error('Load error:', error);
+    return;
+  }
+
+  if (data) {
+    userGenres    = data.favorite_genres || [];
+    searchedBooks = data.searched_books || [];
+  } else {
+    // Create row on first login/signup
+    await supabase.from('user_data').insert({
+      user_id: currentUser.id,
+      username: currentUser.email.split('@')[0],
+      favorite_genres: [],
+      searched_books: []
+    });
+    userGenres = [];
+    searchedBooks = [];
+  }
+}
+
+function finishLogin() {
+  greeting.textContent = `Welcome, ${currentUser.email.split('@')[0]}!`;
+  authScreen.classList.add('hidden');
+  mainNav.classList.remove('hidden');
+
+  if (userGenres.length === 0) {
+    genreScreen.classList.remove('hidden');
+    renderGenreSelection();
+  } else {
+    showTab('search');
+  }
+
+  renderStats();
+}
+
+// Logout
+document.getElementById('logout-btn').onclick = async () => {
+  await supabase.auth.signOut();
+  currentUser = null;
+  userGenres = [];
+  searchedBooks = [];
+  greeting.textContent = 'Welcome! Please sign in or sign up';
+  mainNav.classList.add('hidden');
+  authScreen.classList.remove('hidden');
+  authMessage.textContent = '';
+  isSignupMode = false;
+  updateAuthUI();
+};
+
+// ────────────────────────────────────────────────
+//  Genre Selection
+// ────────────────────────────────────────────────
+function renderGenreSelection() {
+  const container = document.getElementById('genre-select');
+  container.innerHTML = '';
+  COMMON_GENRES.forEach(g => {
+    const tag = document.createElement('span');
+    tag.className = 'genre-tag';
+    if (userGenres.includes(g)) tag.classList.add('selected');
+    tag.textContent = g;
+    tag.onclick = () => {
+      if (userGenres.includes(g)) {
+        userGenres = userGenres.filter(gg => gg !== g);
+        tag.classList.remove('selected');
+      } else {
+        userGenres.push(g);
+        tag.classList.add('selected');
+      }
+    };
+    container.appendChild(tag);
+  });
+}
+
+document.getElementById('save-genres').onclick = async () => {
+  if (userGenres.length === 0) return alert('Select at least one genre!');
+  await saveUserData();
+  genreScreen.classList.add('hidden');
+  showTab('search');
+  renderStats();
+};
+
+// ────────────────────────────────────────────────
+//  Save data helper
+// ────────────────────────────────────────────────
+async function saveUserData() {
+  if (!currentUser) return;
+  await supabase
+    .from('user_data')
+    .update({
+      favorite_genres: userGenres,
+      searched_books: searchedBooks
+    })
+    .eq('user_id', currentUser.id);
+}
+
+// ────────────────────────────────────────────────
+//  Tabs
+// ────────────────────────────────────────────────
+function showTab(tabId) {
+  tabContents.forEach(el => el.classList.add('hidden'));
+  document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+  tabs.forEach(btn => btn.classList.remove('active'));
+  document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+}
+
+tabs.forEach(btn => {
+  btn.onclick = () => {
+    const tab = btn.dataset.tab;
+    showTab(tab);
+    if (tab === 'next') renderNextReads();
+    if (tab === 'stats') renderStats();
+  };
+});
+
+// ────────────────────────────────────────────────
+//  Book Search (Google Books)
+// ────────────────────────────────────────────────
+document.getElementById('search-btn').onclick = searchBooks;
+document.getElementById('search-input').onkeypress = e => { if (e.key === 'Enter') searchBooks(); };
+
+async function searchBooks() {
+  const query = document.getElementById('search-input').value.trim();
+  if (!query) return;
+
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10`;
+  // Add &key=YOUR_KEY if you have one and face rate limits
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.items) throw new Error('No results');
+
+    const container = document.getElementById('search-results');
+    container.innerHTML = '<h3>Results</h3>';
+
+    data.items.forEach(item => {
+      const info = item.volumeInfo;
+      const title = info.title || 'Unknown';
+      const authors = info.authors?.join(', ') || 'Unknown Author';
+      const thumbnail = info.imageLinks?.thumbnail || 'https://via.placeholder.com/80x120?text=No+Cover';
+      const subjects = info.categories || [];
+
+      const card = document.createElement('div');
+      card.className = 'book-card';
+      card.innerHTML = `
+        <img src="${thumbnail}" alt="${title}">
+        <div>
+          <strong>${title}</strong><br>
+          <em>${authors}</em><br>
+          <small>Genres: ${subjects.join(', ') || 'N/A'}</small>
+        </div>
+      `;
+
+      card.onclick = async () => {
+        const book = { title, author: authors, genres: subjects, thumbnail };
+        if (!searchedBooks.some(b => b.title === title && b.author === authors)) {
+          searchedBooks.push(book);
+          await saveUserData();
+          alert(`Saved "${title}"`);
+          renderNextReads();
+          renderStats();
+        }
+      };
+
+      container.appendChild(card);
+    });
+  } catch (err) {
+    document.getElementById('search-results').innerHTML = `<p style="color:red;">${err.message}</p>`;
+  }
+}
+
+// ────────────────────────────────────────────────
+//  Next Reads (simple overlap-based)
+// ────────────────────────────────────────────────
+function renderNextReads() {
+  const container = document.getElementById('next-reads');
+  container.innerHTML = '';
+
+  const allGenres = [...new Set([...userGenres, ...searchedBooks.flatMap(b => b.genres || [])])];
+
+  const recs = searchedBooks
+    .filter(b => b.genres?.some(g => allGenres.includes(g)))
+    .slice(0, 6);
+
+  if (recs.length === 0) {
+    container.innerHTML = '<p>Search and save books to get recommendations!</p>';
+    return;
+  }
+
+  recs.forEach(b => {
+    const div = document.createElement('div');
+    div.className = 'book-card';
+    div.innerHTML = `
+      <img src="${b.thumbnail}" alt="${b.title}">
+      <div>
+        <strong>${b.title}</strong><br>
+        ${b.author}<br>
+        <small>${b.genres?.join(', ') || ''}</small>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ────────────────────────────────────────────────
+//  Stats
+// ────────────────────────────────────────────────
+function renderStats() {
+  document.getElementById('stats').innerHTML = `
+    <p><strong>Email:</strong> ${currentUser?.email || '—'}</p>
+    <p><strong>Genres:</strong> ${userGenres.join(', ') || 'None'}</p>
+    <p><strong>Books saved:</strong> ${searchedBooks.length}</p>
+  `;
+}
+
+// ────────────────────────────────────────────────
+//  Location (simulated libraries)
+// ────────────────────────────────────────────────
+document.getElementById('get-location').onclick = () => {
+  if (!navigator.geolocation) return alert('Geolocation not supported');
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude, longitude } = pos.coords;
+    document.getElementById('location-info').textContent =
+      `Approx: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+
+    // Simulated for Madison, MS
+    const libs = [
+      { name: 'Madison County Library - Madison', dist: '~2 miles' },
+      { name: 'Ridgeland Public Library', dist: '~8 miles' },
+      { name: 'Canton Public Library', dist: '~12 miles' }
+    ];
+
+    document.getElementById('library-results').innerHTML = libs
+      .map(l => `<p>${l.name} — ${l.dist}</p>`)
+      .join('');
+  }, err => alert('Location error: ' + err.message));
+};
+
+// ────────────────────────────────────────────────
+//  Auth state listener (refresh on load)
+// ────────────────────────────────────────────────
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (session) {
+    currentUser = session.user;
+    await loadUserData();
+    finishLogin();
+  } else {
+    currentUser = null;
+    authScreen.classList.remove('hidden');
+    mainNav.classList.add('hidden');
+    genreScreen.classList.add('hidden');
+  }
+});
+
+// Initial check
+(async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await loadUserData();
+    finishLogin();
+  } else {
+    updateAuthUI(); // start in sign-in mode
+  }
+})();
+</script>
+</body>
+</html>
