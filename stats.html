@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Book Finder - Stats</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<header>
+  <div class="header-content">
+    <h1>Book Finder</h1>
+    <p id="greeting">Loading...</p>
+  </div>
+</header>
+
+<nav id="main-nav" class="hidden">
+  <a href="search.html">Search</a>
+  <a href="next.html">Next Reads</a>
+  <a href="stats.html" class="active">Stats</a>
+  <a href="library.html">Library</a>
+  <button id="logout-btn" class="danger">Logout</button>
+</nav>
+
+<div class="container">
+  <div id="content" class="hidden">
+    <h2>Your Stats</h2>
+    <div id="stats-content" class="stats-card"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
