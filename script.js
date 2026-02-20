@@ -3,7 +3,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // ← Paste your Google Books API key here
-const API_KEY = 'YOUR_KEY_HERE';   // ← AIzaSyC...  (from Google Cloud Console)
+const API_KEY = 'AIzaSyBCqpaPv8pOAfdfXOiuTFAp61UYnwUKPC0';   // ← AIzaSyC...  (from Google Cloud Console)
 
 const COMMON_GENRES = [
   "Fiction", "Mystery", "Thriller", "Fantasy", "Science Fiction",
