@@ -58,6 +58,7 @@ nav {
   border-bottom: 1px solid var(--light-gray);
 }
 
+nav a,
 nav button {
   flex: 1;
   padding: 1.1rem 0.8rem;
@@ -68,26 +69,34 @@ nav button {
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.98rem;
+  text-align: center;
+  text-decoration: none; /* for <a> */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+nav a:hover,
 nav button:hover {
   color: var(--primary);
   background: #f8faff;
 }
 
-nav button.active {
+nav a.active {
   color: var(--primary);
   border-bottom: 4px solid var(--primary);
 }
 
 nav #logout-btn {
   background: var(--danger);
-  color: white;
+  color: white !important;
   font-weight: 600;
+  border: none;
 }
 
 nav #logout-btn:hover {
   background: #dc2626;
+  color: white !important;
 }
 
 .container {
